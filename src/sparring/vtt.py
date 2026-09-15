@@ -7,6 +7,7 @@ the tags and drop a cue's line when it merely repeats the previous emitted line.
 
 from __future__ import annotations
 
+import html
 import re
 
 from sparring.models import Segment
@@ -28,7 +29,8 @@ def parse_timestamp(value: str) -> float:
 
 
 def clean_line(line: str) -> str:
-    return _WS.sub(" ", _TAG.sub("", line)).replace("&nbsp;", " ").strip()
+    # Entities first (so &nbsp; becomes whitespace), whitespace collapse last.
+    return _WS.sub(" ", html.unescape(_TAG.sub("", line))).strip()
 
 
 def parse_vtt(content: str) -> list[Segment]:
@@ -47,6 +49,8 @@ def parse_vtt(content: str) -> list[Segment]:
         segments.append(Segment(start_s=start, end_s=end, text=text))
         last_text = text
 
+    # Cues are delimited by timing lines, not blank lines: YouTube emits a
+    # whitespace-only line between the timing and the text of every cue.
     for raw in content.splitlines():
         match = _TIMING.match(raw.strip())
         if match:
@@ -57,10 +61,6 @@ def parse_vtt(content: str) -> list[Segment]:
             in_cue = True
             continue
         if not in_cue:
-            continue
-        if raw.strip() == "":
-            flush()
-            in_cue = False
             continue
         cleaned = clean_line(raw)
         if cleaned and cleaned != last_text and cleaned not in lines:

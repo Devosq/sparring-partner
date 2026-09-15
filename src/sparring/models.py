@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -59,4 +59,4 @@ class Persona:
 @dataclass(frozen=True)
 class Answer:
     text: str
-    sources: tuple[Hit, ...] = field(default_factory=tuple)
+    sources: tuple[Hit, ...] = ()
