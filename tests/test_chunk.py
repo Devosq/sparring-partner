@@ -27,6 +27,14 @@ def test_chunks_cover_all_words_with_overlap() -> None:
     assert chunks[-1].text.split()[-1] == "w9_4"
 
 
+def test_short_tail_is_folded_into_previous_chunk() -> None:
+    # 45 words, window 20, step 12: naive windows would leave a 9-word tail at 36.
+    chunks = chunk_transcript(make_transcript(words=45), chunk_words=20, overlap_words=8)
+    assert [len(c.text.split()) for c in chunks] == [20, 20, 21]
+    assert chunks[-1].text.split()[-1] == "w8_4"
+    assert min(len(c.text.split()) for c in chunks) >= 10
+
+
 def test_single_short_transcript_is_one_chunk() -> None:
     chunks = chunk_transcript(make_transcript(words=10), chunk_words=600)
     assert len(chunks) == 1

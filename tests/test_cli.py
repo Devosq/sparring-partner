@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 
 from sparring import chat as chat_mod
 from sparring import cli
-from sparring.index import VectorIndex
+from sparring.index import IndexCorruptError, VectorIndex
 from sparring.ingest import save_transcript
 from tests.conftest import FakeEmbedder, make_transcript
 
@@ -75,6 +75,24 @@ def test_ask_surfaces_llm_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(cli.app, ["ask", "hi", "--persona", "tester"])
     assert result.exit_code == 1
     assert "model call failed" in result.output
+
+
+def test_trim_history_keeps_most_recent_messages() -> None:
+    history = [{"role": "user", "content": str(n)} for n in range(30)]
+    trimmed = cli._trim_history(history)
+    assert len(trimmed) == cli.MAX_HISTORY_MESSAGES
+    assert trimmed[-1]["content"] == "29"
+    assert len(history) == 30  # input untouched
+
+
+def test_ask_reports_corrupt_index(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(question: str, p: object, index: object) -> object:
+        raise IndexCorruptError("corrupt metadata — rebuild")
+
+    monkeypatch.setattr(chat_mod, "ask", broken)
+    result = runner.invoke(cli.app, ["ask", "hi", "--persona", "tester"])
+    assert result.exit_code == 1
+    assert "rebuild" in result.output
 
 
 def test_chat_loop_runs_until_empty_line(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -20,9 +20,13 @@ V0: a working end-to-end pipeline for one persona, handed over for further devel
   with numbered citations and deep links to the exact timestamp. Any LLM via litellm.
 - `personas/hormozi.yaml` — Alex Hormozi persona: system prompt, 12 mental models,
   style rules.
-- Test suite (43 tests, ~90 % coverage) that runs offline with a fake embedder.
+- Test suite (50 tests, ~91 % coverage) that runs offline with a fake embedder.
 - CI (ruff, ruff format, mypy --strict, pytest with 80 % coverage gate).
 
 ### Verified
 
 - Real run on 2026-09-15: see the PR description for the ingest/index/ask output.
+- Two independent code reviews (general + Python) before merge; all MEDIUM findings fixed:
+  HTML entities decoded in subtitles, short tail chunks folded into the previous chunk,
+  typed `IndexCorruptError` surfaced by the CLI, video-id shape validated before it
+  becomes a file name, chat history capped at 10 turns.

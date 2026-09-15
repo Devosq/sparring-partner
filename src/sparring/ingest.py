@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -17,6 +18,9 @@ from sparring.models import Segment, Transcript
 from sparring.vtt import parse_vtt
 
 log = logging.getLogger(__name__)
+
+# Video IDs become file names; anything outside this shape is refused before it touches a path.
+_VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 VideoMeta = dict[str, Any]
 ListVideos = Callable[[str, int], list[VideoMeta]]
@@ -114,6 +118,8 @@ def ingest_channel(
     stats["listed"] = len(videos)
     for meta in videos:
         video_id = str(meta["id"])
+        if not _VIDEO_ID.match(video_id):
+            raise IngestError(f"refusing unexpected video id {video_id!r} from {channel_url}")
         if transcript_path(data_dir, video_id).is_file():
             stats["skipped"] += 1
             continue

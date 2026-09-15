@@ -7,6 +7,7 @@ the tags and drop a cue's line when it merely repeats the previous emitted line.
 
 from __future__ import annotations
 
+import html
 import re
 
 from sparring.models import Segment
@@ -28,7 +29,8 @@ def parse_timestamp(value: str) -> float:
 
 
 def clean_line(line: str) -> str:
-    return _WS.sub(" ", _TAG.sub("", line)).replace("&nbsp;", " ").strip()
+    # Entities first (so &nbsp; becomes whitespace), whitespace collapse last.
+    return _WS.sub(" ", html.unescape(_TAG.sub("", line))).strip()
 
 
 def parse_vtt(content: str) -> list[Segment]:

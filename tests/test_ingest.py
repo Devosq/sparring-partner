@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from sparring.ingest import (
+    IngestError,
     ingest_channel,
     load_all_transcripts,
     load_transcript,
@@ -57,6 +60,15 @@ def test_ingest_counts_missing_and_empty_subtitles(tmp_path: Path) -> None:
     )
     assert stats == {"listed": 2, "saved": 0, "skipped": 0, "no_subtitles": 2}
     assert load_all_transcripts(tmp_path) == []
+
+
+def test_ingest_refuses_path_like_video_ids(tmp_path: Path) -> None:
+    def evil(channel_url: str, limit: int) -> list[dict[str, object]]:
+        return [{"id": "../../escape"}]
+
+    with pytest.raises(IngestError, match="unexpected video id"):
+        ingest_channel("chan", tmp_path, limit=1, list_videos=evil, fetch_subtitle=_fetch_ok)
+    assert not (tmp_path.parent / "escape.json").exists()
 
 
 def test_save_and_load_roundtrip(tmp_path: Path, transcript: Transcript) -> None:

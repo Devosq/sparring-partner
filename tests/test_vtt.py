@@ -31,6 +31,11 @@ def test_clean_line_strips_inline_tags_and_whitespace() -> None:
     assert clean_line("the<00:00:00.500><c> value</c>  equation") == "the value equation"
 
 
+def test_clean_line_decodes_entities_before_collapsing_whitespace() -> None:
+    assert clean_line("R&amp;D&nbsp;&nbsp;budget &#39;24") == "R&D budget '24"
+    assert clean_line("&nbsp;") == ""
+
+
 def test_parse_vtt_dedupes_rolling_captions() -> None:
     segments = parse_vtt(YOUTUBE_AUTO_SUB)
     texts = [s.text for s in segments]

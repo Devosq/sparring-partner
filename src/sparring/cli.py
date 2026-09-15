@@ -6,17 +6,19 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 from dotenv import load_dotenv
 
 from sparring import chat as chat_mod
 from sparring.chunk import chunk_transcript
-from sparring.index import VectorIndex
+from sparring.index import IndexCorruptError, VectorIndex
 from sparring.ingest import IngestError, ingest_channel, load_all_transcripts
 from sparring.models import Answer
 from sparring.persona import PersonaError, load_persona
+
+MAX_HISTORY_MESSAGES = 20  # 10 turns
 
 app = typer.Typer(
     help="Spar with a creator persona grounded in their own transcripts.",
@@ -46,9 +48,14 @@ def _index(data_dir: Path, persona_name: str) -> VectorIndex:
     )
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     typer.secho(message, err=True, fg=typer.colors.RED)
     raise typer.Exit(code=1)
+
+
+def _trim_history(history: list[chat_mod.Message]) -> list[chat_mod.Message]:
+    """Keep the prompt bounded: only the most recent turns go to the model."""
+    return history[-MAX_HISTORY_MESSAGES:]
 
 
 def _force_utf8_console() -> None:
@@ -80,7 +87,6 @@ def ingest(
         p = load_persona(persona)
     except PersonaError as exc:
         _fail(str(exc))
-        return
     target = _persona_dir(_data_dir(data_dir), p.name)
     totals = {"listed": 0, "saved": 0, "skipped": 0, "no_subtitles": 0}
     for channel in p.channels:
@@ -89,7 +95,6 @@ def ingest(
             stats = ingest_channel(channel, target, limit=limit, langs=p.subtitle_langs)
         except IngestError as exc:
             _fail(str(exc))
-            return
         totals = {key: totals[key] + stats[key] for key in totals}
     typer.echo(
         f"listed {totals['listed']} · saved {totals['saved']} · skipped {totals['skipped']} "
@@ -104,14 +109,13 @@ def index(persona: PersonaOpt = "hormozi", data_dir: DataDirOpt = None) -> None:
         p = load_persona(persona)
     except PersonaError as exc:
         _fail(str(exc))
-        return
     root = _data_dir(data_dir)
     transcripts = load_all_transcripts(_persona_dir(root, p.name))
     if not transcripts:
         _fail("no transcripts found — run `sparring ingest` first")
-        return
     chunks = [c for t in transcripts for c in chunk_transcript(t)]
     vector_index = _index(root, p.name)
+    vector_index.delete_videos(t.video_id for t in transcripts)
     upserted = vector_index.upsert(chunks)
     typer.echo(
         f"{len(transcripts)} transcripts → {upserted} chunks · "
@@ -137,9 +141,8 @@ def ask(
     try:
         p = load_persona(persona)
         answer = chat_mod.ask(question, p, _index(_data_dir(data_dir), p.name))
-    except (PersonaError, chat_mod.LlmError) as exc:
+    except (PersonaError, chat_mod.LlmError, IndexCorruptError) as exc:
         _fail(str(exc))
-        return
     _print_answer(answer)
 
 
@@ -150,7 +153,6 @@ def chat(persona: PersonaOpt = "hormozi", data_dir: DataDirOpt = None) -> None:
         p = load_persona(persona)
     except PersonaError as exc:
         _fail(str(exc))
-        return
     vector_index = _index(_data_dir(data_dir), p.name)
     history: list[chat_mod.Message] = []
     typer.echo(
@@ -165,12 +167,19 @@ def chat(persona: PersonaOpt = "hormozi", data_dir: DataDirOpt = None) -> None:
             break
         try:
             answer = chat_mod.ask(question, p, vector_index, history=history)
+        except IndexCorruptError as exc:
+            _fail(str(exc))
         except chat_mod.LlmError as exc:
             typer.secho(str(exc), err=True, fg=typer.colors.RED)
             continue
         _print_answer(answer)
-        history.append({"role": "user", "content": question})
-        history.append({"role": "assistant", "content": answer.text})
+        history = _trim_history(
+            [
+                *history,
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": answer.text},
+            ]
+        )
 
 
 def main() -> None:

@@ -1,6 +1,9 @@
 from pathlib import Path
+from uuid import uuid4
 
-from sparring.index import VectorIndex
+import pytest
+
+from sparring.index import IndexCorruptError, VectorIndex
 from sparring.models import Chunk
 from tests.conftest import FakeEmbedder
 
@@ -54,13 +57,26 @@ def test_persistent_index_survives_reopen(tmp_path: Path) -> None:
     assert second.count() == 1
 
 
-def test_batching_flushes_in_pieces(fake_index: VectorIndex, monkeypatch: object) -> None:
-    import sparring.index as index_mod
+def test_batching_flushes_in_pieces() -> None:
+    small = VectorIndex(
+        f"batch-{uuid4().hex[:12]}", embedding_function=FakeEmbedder(), upsert_batch=3
+    )
+    chunks = [_chunk("a", n, f"text {n}") for n in range(7)]
+    assert small.upsert(chunks) == 7
+    assert small.count() == 7
 
-    setattr(index_mod, "UPSERT_BATCH", 3)  # noqa: B010
-    try:
-        chunks = [_chunk("a", n, f"text {n}") for n in range(7)]
-        assert fake_index.upsert(chunks) == 7
-        assert fake_index.count() == 7
-    finally:
-        setattr(index_mod, "UPSERT_BATCH", 200)  # noqa: B010
+
+def test_delete_videos_removes_only_those_videos(fake_index: VectorIndex) -> None:
+    fake_index.upsert([_chunk("a", 0, "x"), _chunk("a", 1, "y"), _chunk("b", 0, "z")])
+    fake_index.delete_videos(["a", "missing"])
+    assert fake_index.count() == 1
+    fake_index.delete_videos([])  # no-op
+    assert fake_index.count() == 1
+
+
+def test_corrupt_metadata_raises_typed_error(fake_index: VectorIndex) -> None:
+    fake_index._collection.upsert(  # noqa: SLF001 - deliberately writing bad rows
+        ids=["bad:0"], documents=["broken"], metadatas=[{"video_id": "v", "start_s": "nope"}]
+    )
+    with pytest.raises(IndexCorruptError, match="rebuild"):
+        fake_index.query("broken")

@@ -28,14 +28,18 @@ def chunk_transcript(
         return []
     chunks: list[Chunk] = []
     step = chunk_words - overlap_words
-    index = 0
+    min_tail = chunk_words // 2
     position = 0
-    while position < len(words):
-        window = words[position : position + chunk_words]
+    while True:
+        end = position + chunk_words
+        next_start = position + step
+        # Fold a short tail into this window instead of emitting a near-empty chunk.
+        is_last = end >= len(words) or len(words) - next_start < min_tail
+        window = words[position:] if is_last else words[position:end]
         start_s = window[0][1]
         chunks.append(
             Chunk(
-                chunk_id=f"{transcript.video_id}:{index}",
+                chunk_id=f"{transcript.video_id}:{len(chunks)}",
                 video_id=transcript.video_id,
                 title=transcript.title,
                 text=" ".join(w for w, _ in window),
@@ -43,11 +47,9 @@ def chunk_transcript(
                 url=deep_link(transcript.url, start_s),
             )
         )
-        index += 1
-        if position + chunk_words >= len(words):
-            break
-        position += step
-    return chunks
+        if is_last:
+            return chunks
+        position = next_start
 
 
 def _words_with_time(segments: tuple[Segment, ...]) -> list[tuple[str, float]]:
