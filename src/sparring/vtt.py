@@ -47,6 +47,8 @@ def parse_vtt(content: str) -> list[Segment]:
         segments.append(Segment(start_s=start, end_s=end, text=text))
         last_text = text
 
+    # Cues are delimited by timing lines, not blank lines: YouTube emits a
+    # whitespace-only line between the timing and the text of every cue.
     for raw in content.splitlines():
         match = _TIMING.match(raw.strip())
         if match:
@@ -57,10 +59,6 @@ def parse_vtt(content: str) -> list[Segment]:
             in_cue = True
             continue
         if not in_cue:
-            continue
-        if raw.strip() == "":
-            flush()
-            in_cue = False
             continue
         cleaned = clean_line(raw)
         if cleaned and cleaned != last_text and cleaned not in lines:

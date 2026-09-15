@@ -1,0 +1,7 @@
+# Default owner for everything in this repo.
+* @Devosq
+
+# Prompt and persona changes affect answer quality — owner review.
+/personas/            @Devosq
+/src/sparring/chat.py @Devosq
+/.github/             @Devosq
