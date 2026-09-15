@@ -1,0 +1,54 @@
+[project]
+name = "sparring-partner"
+version = "0.1.0"
+description = "Chat with a creator persona grounded in their own YouTube transcripts (RAG, local index, any LLM)."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Oscar Vatanen" }]
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=1.5.9",
+    "litellm>=1.70",
+    "python-dotenv>=1.1",
+    "pyyaml>=6.0",
+    "typer>=0.27",
+    "yt-dlp>=2026.8",
+]
+
+[project.scripts]
+sparring = "sparring.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19",
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+    "ruff>=0.16",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "sparring"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N", "W"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=sparring --cov-report=term-missing --cov-fail-under=80"
+filterwarnings = ["ignore::DeprecationWarning"]

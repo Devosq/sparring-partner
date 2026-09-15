@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+dist/
+.claude/worktrees/
